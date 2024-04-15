@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 
+
 def depsolve(packages, repositories, arch, info):
     req = {
         "command": "depsolve",
@@ -45,114 +46,198 @@ def process_sets(sets):
     }
 
 
-def prepare(args):
+def prepare(request):
     with tempfile.TemporaryDirectory() as tmpdir:
-        request = {}
-        if args.request:
-            with open(args.request, "r") as f:
-                request = json.load(f)
-
-        if args.version:
-            request["version"] = args.version
-        if args.arch:
-            request["arch"] = args.arch
-        if args.type:
-            request["type"] = args.type
-
-        if "version" not in request:
-            raise RuntimeError("version not specified")
-        if "arch" not in request:
-            raise RuntimeError("arch not specified")
-        if "type" not in request:
-            raise RuntimeError("type not specified")
-        
-        if "customizations" not in request:
-            request["customizations"] = {}
-
         request_file = os.path.join(tmpdir, "request.json")
         with open(request_file, "w") as f:
             json.dump(request, f)
-
         image = subprocess.run(
             [
                 "jsonnet",
                 "--tla-code-file",
                 f"request={request_file}",
-                os.path.join("def", args.type, "image.jsonnet"),
+                os.path.join("def", request["type"], "image.jsonnet"),
             ],
             check=True,
             encoding="utf8",
             stdout=subprocess.PIPE,
         )
 
-        image = json.loads(image.stdout)
-
-        sets = {
-            key: depsolve(packages, image["repositories"], args.arch, image)
-            for (key, packages) in image["packages"].items()
-        }
-
-        print(
-            json.dumps(
-                {
-                    "sources": {"org.osbuild.rpm": process_sets(sets)},
-                    "request": request,
-                    "image": image,
-                }
-            )
-        )
+    return {
+        "request": request,
+        "image": json.loads(image.stdout),
+    }
 
 
-def manifest(args):
-    if args.bundle == "-":
-        f = sys.stdin
-    else:
-        f = open(args.bundle, "r")
+def cmd_prepare(args):
+    request = {}
+    if args.request:
+        with open(args.request, "r") as f:
+            request = json.load(f)
 
-    bundle = json.load(f)
+    if args.version:
+        request["version"] = args.version
+    if args.arch:
+        request["arch"] = args.arch
+    if args.type:
+        request["type"] = args.type
 
+    if "version" not in request:
+        raise RuntimeError("version not specified")
+    if "arch" not in request:
+        raise RuntimeError("arch not specified")
+    if "type" not in request:
+        raise RuntimeError("type not specified")
+
+    if "customizations" not in request:
+        request["customizations"] = {}
+
+    json.dump(prepare(request), sys.stdout)
+
+
+def resolve(request, image):
+    sets = {
+        key: depsolve(packages, image["repositories"], request["arch"], image)
+        for (key, packages) in image["packages"].items()
+    }
+
+    return {
+        "sources": {"org.osbuild.rpm": process_sets(sets)},
+        "request": request,
+        "image": image,
+    }
+
+def cmd_resolve(args):
+    r = json.load(sys.stdin)
+    json.dump(resolve(r["request"], r["image"]), sys.stdout)
+
+
+def finalize(request, manifest, sources):
     with tempfile.TemporaryDirectory() as tmpdir:
         bundle_file = os.path.join(tmpdir, "bundle.json")
         with open(bundle_file, "w") as f:
-            json.dump(bundle, f)
-        subprocess.run(
+            json.dump(
+                {
+                    "request": request,
+                    "image": manifest,
+                    "sources": sources,
+                },
+                f,
+            )
+
+        manifest = subprocess.run(
             [
                 "jsonnet",
                 "--tla-code-file",
                 f"bundle={bundle_file}",
-                os.path.join("def", bundle["request"]["type"], "manifest.jsonnet"),
+                os.path.join("def", request["type"], "manifest.jsonnet"),
             ],
             check=True,
+            encoding="utf8",
+            stdout=subprocess.PIPE,
         )
+
+        return json.loads(manifest.stdout)
+
+def cmd_finalize(args):
+    bundle = json.load(sys.stdin)
+    json.dump(finalize(bundle["request"], bundle["image"], bundle["sources"]), sys.stdout)
+
+def cmd_manifest(args):
+    request = {}
+    if args.request:
+        with open(args.request, "r") as f:
+            request = json.load(f)
+
+    if args.version:
+        request["version"] = args.version
+    if args.arch:
+        request["arch"] = args.arch
+    if args.type:
+        request["type"] = args.type
+
+    if "version" not in request:
+        raise RuntimeError("version not specified")
+    if "arch" not in request:
+        raise RuntimeError("arch not specified")
+    if "type" not in request:
+        raise RuntimeError("type not specified")
+
+    if "customizations" not in request:
+        request["customizations"] = {}
+
+    r = prepare(request)
+    bundle = resolve(r["request"], r["image"])
+    manifest = finalize(bundle["request"], bundle["image"], bundle["sources"])
+
+    json.dump(manifest, sys.stdout)
 
 
 def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
+    manifest_parser = subparsers.add_parser("manifest")
+
+    manifest_parser.add_argument(
+        "--request", type=str, help="request file (optional)", required=False
+    )
+    manifest_parser.add_argument(
+        "--type",
+        type=str,
+        help="type (required if not by the request file)",
+        required=False,
+    )
+    manifest_parser.add_argument(
+        "--arch",
+        type=str,
+        help="arch (required if not by the request file)",
+        required=False,
+    )
+    manifest_parser.add_argument(
+        "--version",
+        type=str,
+        help="distribution version  (required if not by the request file)",
+        required=False,
+    )
+
 
     prepare_parser = subparsers.add_parser("prepare")
     prepare_parser.add_argument(
         "--request", type=str, help="request file (optional)", required=False
     )
     prepare_parser.add_argument(
-        "--type", type=str, help="type (required if not by the request file)", required=False
+        "--type",
+        type=str,
+        help="type (required if not by the request file)",
+        required=False,
     )
     prepare_parser.add_argument(
-        "--arch", type=str, help="arch (required if not by the request file)", required=False
+        "--arch",
+        type=str,
+        help="arch (required if not by the request file)",
+        required=False,
     )
     prepare_parser.add_argument(
-        "--version", type=str, help="distribution version  (required if not by the request file)", required=False
+        "--version",
+        type=str,
+        help="distribution version  (required if not by the request file)",
+        required=False,
     )
 
-    manifest_parser = subparsers.add_parser("manifest")
-    manifest_parser.add_argument("bundle", type=str, help="bundle (required)")
+    subparsers.add_parser("resolve")
+    subparsers.add_parser("finalize")
+
 
     args = parser.parse_args()
 
     if args.command == "prepare":
-        prepare(args)
+        cmd_prepare(args)
     elif args.command == "manifest":
-        manifest(args)
+        cmd_manifest(args)
+    elif args.command == "resolve":
+        cmd_resolve(args)
+    elif args.command == "finalize":
+        cmd_finalize(args)
 
 
 if __name__ == "__main__":

@@ -34,26 +34,34 @@ Contains a function that takes a request, an image (see `image.jsonnet`), and "s
 - `sources` a list of items for the `org.osbuild.curl` source.
 
 ## Compiler
-`ibdc` is a compiler for converting definitions to osbuild manifests. It has two commands: `prepare` and `manifest`.
-
-### `ibdc prepare`
-```
-./ibdc prepare --type raw --request request.json --arch x86_64 --version 40 >bundle.json
-```
-
-This command primarily resolves `image.jsonnet` based on the type, and runs all resolvers. The resulting file is called a "bundle". It contains the passed request, image and the sources object needed for `manifest.jsonnet` (see above).
+`ibdc` is a compiler for converting definitions to osbuild manifests. The basic command is `ibdc manifest`:
 
 ### `ibdc manifest`
 ```
-./ibdc manifest bundle.json >manifest.json
+./ibdc manifest --type raw --request request.json --arch x86_64 --version 40 >manifest.json
 ```
 
-This command is used convert a bundle into an osbuild manifest.
+This command takes the given request, generates `image.jsonnet`, resolves it, and generates a manifest from `manifest.jsonnet`.
 
-## Useful one-liner
+
+### "Plumbing" commands
+
+Sometimes, more control is needed over the manifest generation process. Thus, three plumbing commands are available:
+
+- `ibdc prepare` - takes the same arguments as `ibdc manifest`, but returns just the processed image before resolving any sources.
+- `ibdc resolve` - takes a request and an image, return them together with resolved sources.
+- `ibdc finalize` - takes a request, an image and resolved sources, and returns a final osbuild manifest.
+
+These commands can be neatly used in a pipeline:
 
 ```
-./ibdc prepare --type raw --arch x86_64 --version 40 | ./ibdc manifest -
+./ibdc prepare --type raw --arch x86_64 --version 40 --request request.json | ./ibdc resolve | ./ibdc finalize
+```
+
+This has the same effect as:
+
+```
+./ibdc manifest --type raw --arch x86_64 --version 40 --request request.json
 ```
 
 ## Current status
