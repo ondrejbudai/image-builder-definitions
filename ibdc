@@ -87,13 +87,8 @@ def prepare(args):
 
         image = json.loads(image.stdout)
 
-        if args.repositories:
-            repositories = json.loads(args.repositories)
-        else:
-            repositories = image["repositories"]
-
         sets = {
-            key: depsolve(packages, repositories, args.arch, image)
+            key: depsolve(packages, image["repositories"], args.arch, image)
             for (key, packages) in image["packages"].items()
         }
 
@@ -147,12 +142,6 @@ def main():
     )
     prepare_parser.add_argument(
         "--version", type=str, help="distribution version  (required if not by the request file)", required=False
-    )
-    prepare_parser.add_argument(
-        "--repositories",
-        type=str,
-        help="repositories (overrides the ones from the definition)",
-        required=False,
     )
 
     manifest_parser = subparsers.add_parser("manifest")

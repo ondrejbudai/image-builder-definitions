@@ -17,13 +17,13 @@ Contains a function that takes an (image) request as its argument. The request i
 - `version` - distribution version (can be also passed as `--version` to `ibdc prepare`)
 - `arch` - image architecture (can be also passed as `--type` to `ibdc prepare`)
 - `customizations` - an object describing all applicable customizations (at least an empty object is always passed, if it doesn't exist in the original request, `ibdc prepare` creates it)
+- `repositories` - overrides the default repositories defined by the image itslef
 
 This file returns a high-level description of the image with the following fields:
 
 - `packages` - an object of string lists. Every object is passed to a depsolver separately
 - `module_platform_id`
-- `repositories` - a list of repositories that the packages will be depsolved against (note that ibdc takes overrides, see below)
-- ... more properties useful for higher-level tools
+- `repositories` - a list of repositories that the packages will be depsolved against (caller MUST be able to override these with `request.repositories`, see above)
 
 
 ### `manifest.jsonnet`

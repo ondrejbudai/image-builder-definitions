@@ -1,11 +1,12 @@
 function(request) {
     module_platform_id: 'platform:f%s' % request.version,
-    repositories: [
+    repositories: std.get(request, "repositories", [
+      // default repositories
       {
         id: 'fedora',
         baseurl: 'https://rpmrepo.osbuild.org/v2/mirror/public/f39/f39-x86_64-fedora-20231109',
       },
-    ],
+    ]),
     packages: {
         build: {
             include: [
