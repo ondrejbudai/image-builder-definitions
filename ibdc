@@ -8,28 +8,6 @@ import subprocess
 import sys
 import tempfile
 
-
-def hash_directory(path):
-    digest = hashlib.sha256()
-
-    for root, dirs, files in os.walk(path):
-        for names in sorted(files):
-            file_path = os.path.join(root, names)
-
-            # Hash the path and add to the digest to account for empty files/directories
-            digest.update(hashlib.sha256(file_path[len(path) :].encode()).digest())
-
-            if os.path.isfile(file_path):
-                with open(file_path, "rb") as f_obj:
-                    while True:
-                        buf = f_obj.read(1024 * 1024)
-                        if not buf:
-                            break
-                        digest.update(buf)
-
-    return "sha256:" + digest.hexdigest()
-
-
 def depsolve(packages, repositories, arch, info):
     req = {
         "command": "depsolve",
@@ -69,21 +47,37 @@ def process_sets(sets):
 
 def prepare(args):
     with tempfile.TemporaryDirectory() as tmpdir:
-        if args.blueprint:
-            bp_file = args.blueprint
-        else:
-            bp_file = os.path.join(tmpdir, "blueprint.json")
-            with open(bp_file, "w") as f:
-                f.write("{}")
+        request = {}
+        if args.request:
+            with open(args.request, "r") as f:
+                request = json.load(f)
 
-        with open(bp_file, "r") as f:
-            blueprint = json.load(f)
+        if args.version:
+            request["version"] = args.version
+        if args.arch:
+            request["arch"] = args.arch
+        if args.type:
+            request["type"] = args.type
+
+        if "version" not in request:
+            raise RuntimeError("version not specified")
+        if "arch" not in request:
+            raise RuntimeError("arch not specified")
+        if "type" not in request:
+            raise RuntimeError("type not specified")
+        
+        if "customizations" not in request:
+            request["customizations"] = {}
+
+        request_file = os.path.join(tmpdir, "request.json")
+        with open(request_file, "w") as f:
+            json.dump(request, f)
 
         image = subprocess.run(
             [
                 "jsonnet",
                 "--tla-code-file",
-                f"blueprint={bp_file}",
+                f"request={request_file}",
                 os.path.join("def", args.type, "image.jsonnet"),
             ],
             check=True,
@@ -107,10 +101,8 @@ def prepare(args):
             json.dumps(
                 {
                     "sources": {"org.osbuild.rpm": process_sets(sets)},
-                    "blueprint": blueprint,
-                    "type": args.type,
-                    "arch": args.arch,
-                    "digest": hash_directory(os.path.join("def", args.type)),
+                    "request": request,
+                    "image": image,
                 }
             )
         )
@@ -124,9 +116,6 @@ def manifest(args):
 
     bundle = json.load(f)
 
-    if bundle["digest"] != hash_directory(os.path.join("def", bundle["type"])):
-        raise RuntimeError("digest mismatch")
-
     with tempfile.TemporaryDirectory() as tmpdir:
         bundle_file = os.path.join(tmpdir, "bundle.json")
         with open(bundle_file, "w") as f:
@@ -136,7 +125,7 @@ def manifest(args):
                 "jsonnet",
                 "--tla-code-file",
                 f"bundle={bundle_file}",
-                os.path.join("def", bundle["type"], "manifest.jsonnet"),
+                os.path.join("def", bundle["request"]["type"], "manifest.jsonnet"),
             ],
             check=True,
         )
@@ -148,13 +137,16 @@ def main():
 
     prepare_parser = subparsers.add_parser("prepare")
     prepare_parser.add_argument(
-        "--blueprint", type=str, help="blueprint file (optional)", required=False
+        "--request", type=str, help="request file (optional)", required=False
     )
     prepare_parser.add_argument(
-        "--type", type=str, help="type (required)", required=True
+        "--type", type=str, help="type (required if not by the request file)", required=False
     )
     prepare_parser.add_argument(
-        "--arch", type=str, help="arch (required)", required=True
+        "--arch", type=str, help="arch (required if not by the request file)", required=False
+    )
+    prepare_parser.add_argument(
+        "--version", type=str, help="distribution version  (required if not by the request file)", required=False
     )
     prepare_parser.add_argument(
         "--repositories",

@@ -1,6 +1,6 @@
 function(bundle) {
   local sources = bundle.sources,
-  local blueprint = bundle.blueprint,
+  local request = bundle.request,
 
   version: '2',
   pipelines:
@@ -50,13 +50,13 @@ function(bundle) {
         {
           type: 'org.osbuild.hostname',
           options: {
-            hostname: if std.objectHas(blueprint, 'customizations') && std.objectHas(blueprint.customizations, 'hostname') then blueprint.customizations.hostname else 'localhost.localdomain',
+            hostname: if std.objectHas(request.customizations, 'hostname') then request.customizations.hostname else 'localhost.localdomain',
           },
         },
         {
           type: 'org.osbuild.timezone',
           options: {
-            zone: if std.objectHas(blueprint, 'customizations') && std.objectHas(blueprint.customizations, 'timezone') then blueprint.customizations.timezone else 'localhost.localdomain',
+            zone: if std.objectHas(request.customizations, 'timezone') then request.customizations.timezone else 'localhost.localdomain',
           },
         },
         {

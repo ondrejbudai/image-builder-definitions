@@ -1,5 +1,5 @@
-function(blueprint={}) {
-    module_platform_id: 'platform:f40',
+function(request) {
+    module_platform_id: 'platform:f%s' % request.version,
     repositories: [
       {
         id: 'fedora',
@@ -44,8 +44,8 @@ function(blueprint={}) {
                 "xfsprogs",
                 "xz",
             ]
-            + std.get(blueprint, "packages", [])
-            + if std.objectHas(blueprint, "customizations") && std.objectHas(blueprint.customizations, "timezone") then ["chrony"] else [],
+            + std.get(request.customizations, "packages", [])
+            + if std.objectHas(request.customizations, "timezone") then ["chrony"] else [],
         }
     },
 

@@ -8,10 +8,17 @@ Declarative Operating System definitions compilable into osbuild manifests.
 
 A single definition is a directory with 2 files in the [Jsonnet format](https://jsonnet.org/): `image.jsonnet` and `manifest.jsonnet`.
 
-The difference between these files is that `image.jsonnet` requires just a blueprint, whereas `manifest.jsonnet` also depends on the result of a depsolver.
+The difference between these files is that `image.jsonnet` requires just an image request, whereas `manifest.jsonnet` also depends on the result of a depsolver.
 
 ### `image.jsonnet`
-Contains a function that takes a blueprint as its argument, and returns a high-level description of the image with the following fields:
+Contains a function that takes an (image) request as its argument. The request is an object with the following fields:
+
+- `type` - image type (can be also passed as `--type` to `ibdc prepare`)
+- `version` - distribution version (can be also passed as `--version` to `ibdc prepare`)
+- `arch` - image architecture (can be also passed as `--type` to `ibdc prepare`)
+- `customizations` - an object describing all applicable customizations (at least an empty object is always passed, if it doesn't exist in the original request, `ibdc prepare` creates it)
+
+This file returns a high-level description of the image with the following fields:
 
 - `packages` - an object of string lists. Every object is passed to a depsolver separately
 - `module_platform_id`
@@ -20,7 +27,7 @@ Contains a function that takes a blueprint as its argument, and returns a high-l
 
 
 ### `manifest.jsonnet`
-Contains a function that takes a blueprint, and "sources" as its arguments, and returns an osbuild manifest.
+Contains a function that takes a request, an image (see `image.jsonnet`), and "sources" as its arguments, and returns an osbuild manifest.
 
 "Sources" are currently an object with one key `org.osbuild.rpm`. This inner object contains two keys:
 - `refs` - an object of string lists, its keys correspons to `packages` as defined in `image.jsonnet`. The format of the individual items are osbuild input references. Thus, you can pass this object to inputs of an org.osbuild.rpm stage.
@@ -31,22 +38,22 @@ Contains a function that takes a blueprint, and "sources" as its arguments, and 
 
 ### `ibdc prepare`
 ```
-./ibdc prepare --type raw --blueprint bp.json --arch x86_64 >bundle.json
+./ibdc prepare --type raw --request request.json --arch x86_64 --version 40 >bundle.json
 ```
 
-This command primarily takes `image.jsonnet` and depsolves it. The resulting file is called a "bundle". It contains the passed `--type`, `--blueprint`, `--arch` and the sources object needed for `manifest.jsonnet` (see above). Note that the file also carries the checksum of the used image definition.
+This command primarily resolves `image.jsonnet` based on the type, and runs all resolvers. The resulting file is called a "bundle". It contains the passed request, image and the sources object needed for `manifest.jsonnet` (see above).
 
 ### `ibdc manifest`
 ```
 ./ibdc manifest bundle.json >manifest.json
 ```
 
-This command is used convert a bundle into an osbuild manifest. Note that since the bundle contains the checksum of the definition, this command will fail if you modified the definitions between calls to `ibdc prepare` and `ibdc manifest`.
+This command is used convert a bundle into an osbuild manifest.
 
 ## Useful one-liner
 
 ```
-./ibdc prepare --type raw --blueprint bp.json --arch x86_64 | ./ibdc manifest -
+./ibdc prepare --type raw --arch x86_64 --version 40 | ./ibdc manifest -
 ```
 
 ## Current status

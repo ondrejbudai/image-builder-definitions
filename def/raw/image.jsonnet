@@ -1,4 +1,4 @@
-local info = import '../_common/images/disk.jsonnet';
-function(blueprint) info(blueprint) {
+local disk = import '../_common/images/disk.jsonnet';
+function(request) disk(request) {
   exports: ["image"]
 }

@@ -1,0 +1,11 @@
+{
+  "customizations": {
+    "packages": [
+      "tmux"
+    ],
+    "customizations": {
+      "hostname": "toucan.example.com",
+      "timezone": "Europe/Prague"
+    }
+  }
+}
