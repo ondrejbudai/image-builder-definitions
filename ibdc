@@ -1,0 +1,178 @@
+#!/usr/bin/python3
+
+import argparse
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import tempfile
+
+
+def hash_directory(path):
+    digest = hashlib.sha256()
+
+    for root, dirs, files in os.walk(path):
+        for names in sorted(files):
+            file_path = os.path.join(root, names)
+
+            # Hash the path and add to the digest to account for empty files/directories
+            digest.update(hashlib.sha256(file_path[len(path) :].encode()).digest())
+
+            if os.path.isfile(file_path):
+                with open(file_path, "rb") as f_obj:
+                    while True:
+                        buf = f_obj.read(1024 * 1024)
+                        if not buf:
+                            break
+                        digest.update(buf)
+
+    return "sha256:" + digest.hexdigest()
+
+
+def depsolve(packages, repositories, arch, info):
+    req = {
+        "command": "depsolve",
+        "arch": arch,
+        "module_platform_id": info["module_platform_id"],
+        "arguments": {
+            "repos": repositories,
+            "transactions": [{"package-specs": packages["include"]}],
+        },
+        "cachedir": "/tmp/ibdc-dnf-cache",
+    }
+
+    res = subprocess.run(
+        ["/usr/libexec/osbuild-depsolve-dnf"],
+        check=True,
+        input=json.dumps(req),
+        encoding="utf8",
+        stdout=subprocess.PIPE,
+    )
+
+    return json.loads(res.stdout)
+
+
+def process_sets(sets):
+    sources = {}
+    for s in sets.values():
+        for package in s:
+            sources[package["checksum"]] = package["remote_location"]
+
+    return {
+        "sources": sources,
+        "refs": {
+            id: [p["checksum"] for p in packages] for (id, packages) in sets.items()
+        },
+    }
+
+
+def prepare(args):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        if args.blueprint:
+            bp_file = args.blueprint
+        else:
+            bp_file = os.path.join(tmpdir, "blueprint.json")
+            with open(bp_file, "w") as f:
+                f.write("{}")
+
+        with open(bp_file, "r") as f:
+            blueprint = json.load(f)
+
+        image = subprocess.run(
+            [
+                "jsonnet",
+                "--tla-code-file",
+                f"blueprint={bp_file}",
+                os.path.join("def", args.type, "image.jsonnet"),
+            ],
+            check=True,
+            encoding="utf8",
+            stdout=subprocess.PIPE,
+        )
+
+        image = json.loads(image.stdout)
+
+        if args.repositories:
+            repositories = json.loads(args.repositories)
+        else:
+            repositories = image["repositories"]
+
+        sets = {
+            key: depsolve(packages, repositories, args.arch, image)
+            for (key, packages) in image["packages"].items()
+        }
+
+        print(
+            json.dumps(
+                {
+                    "sources": {"org.osbuild.rpm": process_sets(sets)},
+                    "blueprint": blueprint,
+                    "type": args.type,
+                    "arch": args.arch,
+                    "digest": hash_directory(os.path.join("def", args.type)),
+                }
+            )
+        )
+
+
+def manifest(args):
+    if args.bundle == "-":
+        f = sys.stdin
+    else:
+        f = open(args.bundle, "r")
+
+    bundle = json.load(f)
+
+    if bundle["digest"] != hash_directory(os.path.join("def", bundle["type"])):
+        raise RuntimeError("digest mismatch")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        bundle_file = os.path.join(tmpdir, "bundle.json")
+        with open(bundle_file, "w") as f:
+            json.dump(bundle, f)
+        subprocess.run(
+            [
+                "jsonnet",
+                "--tla-code-file",
+                f"bundle={bundle_file}",
+                os.path.join("def", bundle["type"], "manifest.jsonnet"),
+            ],
+            check=True,
+        )
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command")
+
+    prepare_parser = subparsers.add_parser("prepare")
+    prepare_parser.add_argument(
+        "--blueprint", type=str, help="blueprint file (optional)", required=False
+    )
+    prepare_parser.add_argument(
+        "--type", type=str, help="type (required)", required=True
+    )
+    prepare_parser.add_argument(
+        "--arch", type=str, help="arch (required)", required=True
+    )
+    prepare_parser.add_argument(
+        "--repositories",
+        type=str,
+        help="repositories (overrides the ones from the definition)",
+        required=False,
+    )
+
+    manifest_parser = subparsers.add_parser("manifest")
+    manifest_parser.add_argument("bundle", type=str, help="bundle (required)")
+
+    args = parser.parse_args()
+
+    if args.command == "prepare":
+        prepare(args)
+    elif args.command == "manifest":
+        manifest(args)
+
+
+if __name__ == "__main__":
+    main()
