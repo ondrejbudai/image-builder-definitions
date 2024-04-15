@@ -65,7 +65,7 @@ This has the same effect as:
 ```
 
 ## Current status
-Currently, `qcow2` and `raw` images are available. Blueprints supports the following fields:
+Currently, `qcow2`, `raw` and `image-installer` images are available. Blueprints supports the following fields:
 - `packages` - a list of extra packages
 - `customizations.hostname` - a custom hostname
 - `customizations.timezone` - a custom timezone
