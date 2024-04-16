@@ -29,24 +29,21 @@ function(request) {
     },
     os: {
       include: [
-                 'btrfs-progs',
-                 'dnf',
-                 'dosfstools',
-                 'e2fsprogs',
-                 'grub2-pc',
-                 'policycoreutils',
-                 'python3-iniparse',
-                 'python3-pyyaml',
-                 'qemu-img',
-                 'rpm-ostree',
-                 'selinux-policy-targeted',
-                 'systemd',
-                 'tar',
-                 'xfsprogs',
-                 'xz',
+                 '@Fedora Cloud Server',
+                 'chrony',
+                 'langpacks-en',
+                 'qemu-guest-agent',
+                 'kernel-core',
                ]
                + std.get(request.customizations, 'packages', [])
                + if std.objectHas(request.customizations, 'timezone') then ['chrony'] else [],
+      exclude: [
+        'dracut-config-rescue',
+        'firewalld',
+        'geolite2-city',
+        'geolite2-country',
+        'plymouth',
+      ],
     },
     anaconda: {
       include: [
