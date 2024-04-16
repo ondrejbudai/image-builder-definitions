@@ -3,9 +3,8 @@
     "packages": [
       "tmux"
     ],
-    "customizations": {
-      "hostname": "toucan.example.com",
-      "timezone": "Europe/Prague"
-    }
+    "hostname": "toucan.example.com",
+    "timezone": "Europe/Prague",
+    "kernel": "kernel"
   }
 }

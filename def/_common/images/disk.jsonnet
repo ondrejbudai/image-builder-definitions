@@ -1,4 +1,5 @@
 function(request) {
+  local kernel = std.get(request.customizations, 'kernel', "kernel-core"),
   module_platform_id: 'platform:f%s' % request.version,
   repositories: std.get(request, 'repositories', [
     // default repositories
@@ -7,6 +8,7 @@ function(request) {
       baseurl: 'https://rpmrepo.osbuild.org/v2/mirror/public/f39/f39-x86_64-fedora-20231109',
     },
   ]),
+  kernel: kernel,
   packages: {
     build: {
       include: [
@@ -33,8 +35,8 @@ function(request) {
                  'chrony',
                  'langpacks-en',
                  'qemu-guest-agent',
-                 'kernel-core',
                ]
+               + [kernel]
                + std.get(request.customizations, 'packages', [])
                + if std.objectHas(request.customizations, 'timezone') then ['chrony'] else [],
       exclude: [
