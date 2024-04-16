@@ -1,6 +1,12 @@
 function(bundle) {
   local sources = bundle.sources,
   local request = bundle.request,
+  local locate_kernel_vra = function(set, kernel_name)
+    local pkg = std.filter(function(pkg) pkg["name"] == kernel_name, set);
+    assert std.length(pkg) == 1: "expected exactly one kernel package";
+    std.format("%s-%s.%s", [pkg[0]["version"], pkg[0]["release"], pkg[0]["arch"]]),
+
+  local kernel_vra = locate_kernel_vra(sources['org.osbuild.rpm'].refs.anaconda, bundle.image.kernel),
 
   version: '2',
   pipelines:
@@ -93,7 +99,7 @@ function(bundle) {
             type: 'org.osbuild.dracut',
             options: {
               kernel: [
-                '6.5.6-300.fc39.x86_64',
+                kernel_vra,
               ],
               modules: [
                 'bash',
@@ -299,11 +305,11 @@ function(bundle) {
             "options": {
               "paths": [
                 {
-                  "from": "input://tree/boot/vmlinuz-6.5.6-300.fc39.x86_64",
+                  "from": std.format("input://tree/boot/vmlinuz-%s", kernel_vra),
                   "to": "tree:///images/pxeboot/vmlinuz"
                 },
                 {
-                  "from": "input://tree/boot/initramfs-6.5.6-300.fc39.x86_64.img",
+                  "from": std.format("input://tree/boot/initramfs-%s", kernel_vra),
                   "to": "tree:///images/pxeboot/initrd.img"
                 }
               ]
