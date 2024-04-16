@@ -30,7 +30,7 @@ This file returns a high-level description of the image with the following field
 Contains a function that takes a request, an image (see `image.jsonnet`), and "sources" as its arguments, and returns an osbuild manifest.
 
 "Sources" are currently an object with one key `org.osbuild.rpm`. This inner object contains two keys:
-- `refs` - an object of string lists, its keys correspons to `packages` as defined in `image.jsonnet`. The format of the individual items are osbuild input references. Thus, you can pass this object to inputs of an org.osbuild.rpm stage.
+- `refs` - an object of list of object. The top level keys correspons to `packages` as defined in `image.jsonnet`. The format of the individual items are the output of the depsolver: it contains keys like `name`, `version`, `checksum`, `remote_location`, etc.
 - `sources` a list of items for the `org.osbuild.curl` source.
 
 ## Compiler

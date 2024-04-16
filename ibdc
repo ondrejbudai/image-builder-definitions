@@ -41,7 +41,7 @@ def process_sets(sets):
     return {
         "sources": sources,
         "refs": {
-            id: [p["checksum"] for p in packages] for (id, packages) in sets.items()
+            id: [p for p in packages] for (id, packages) in sets.items()
         },
     }
 

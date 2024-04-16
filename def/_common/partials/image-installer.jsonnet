@@ -23,7 +23,7 @@ function(bundle) {
               packages: {
                 type: 'org.osbuild.files',
                 origin: 'org.osbuild.source',
-                references: sources['org.osbuild.rpm'].refs.anaconda,
+                references: std.map(function(rpm) rpm["checksum"], sources['org.osbuild.rpm'].refs.anaconda),
               },
             },
             options: {

@@ -1,4 +1,4 @@
-function(rpmRefs) {
+function(rpms) {
   name: 'build',
   stages: [
     {
@@ -7,7 +7,7 @@ function(rpmRefs) {
         packages: {
           type: 'org.osbuild.files',
           origin: 'org.osbuild.source',
-          references: rpmRefs,
+          references: std.map(function(rpm) rpm["checksum"], rpms),
         },
       },
       options: {
