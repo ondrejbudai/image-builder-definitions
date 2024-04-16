@@ -16,7 +16,7 @@ def depsolve(packages, repositories, arch, info):
         "module_platform_id": info["module_platform_id"],
         "arguments": {
             "repos": repositories,
-            "transactions": [{"package-specs": packages["include"]}],
+            "transactions": [{"package-specs": packages["include"], "exclude-specs": packages.get("exclude", [])}],
         },
         "cachedir": "/tmp/ibdc-dnf-cache",
     }
